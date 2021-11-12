@@ -123,7 +123,28 @@ class NewExtractor(FeatureExtractor):
         dx, dy = Actions.directionToVector(action)
         next_x, next_y = int(x + dx), int(y + dy)
 
-        # find capsules when it is still reasonably near? chase after the ghost scaredTimer is activated
+        # prioritise capsules over normal food
+        # don't care about scared ghosts, prioritise scared ghosts over normal food
+        scaredGhosts = []
+        normalGhosts = []
+        for g in state.getGhostStates:
+            if g.isScared:
+                scaredGhosts.append(g)
+            else:
+                normalGhosts.append(g)
+
+        # count the number of normal ghosts 1-step away
+        features["#-of-ghosts-1-step-away"] = sum(
+            (next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in normalGhosts)
+
+        if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
+            features["eats-food"] = 1.0
+
+        if not features["#-of-ghosts-1-step-away"] and capsules[next_x][next_y]:
+            features["eats-capsule"] = 3.0
+
+        if not features["#-of-ghosts-1-step-away"] and scaredGhosts[next_x][next_y]:
+            features["eats-ghosts"] = 5.0
 
         dist = closestFood((next_x, next_y), food, walls)
         if dist is not None:
