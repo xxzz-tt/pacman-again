@@ -14,7 +14,7 @@
 
 "Feature extractors for Pacman game states"
 
-from game import Directions, Actions
+from game import Directions, Actions, Grid
 import util
 
 class FeatureExtractor:
@@ -103,19 +103,16 @@ class SimpleExtractor(FeatureExtractor):
         return features
 
 class NewExtractor(FeatureExtractor):
-    """
-    Design you own feature extractor here. You may define other helper functions you find necessary.
-    """
-    def getFeatures(self, state, action):
-        "*** YOUR CODE HERE ***"
-        # ghosts, food, capsules
+#    """
+#    Design your own feature extractor here. You may define other helper functions you find necessary.
+#    """
+     def getFeatures(self, state, action):
         food = state.getFood()
         walls = state.getWalls()
         ghosts = state.getGhostPositions()
         capsules = state.getCapsules()
 
         features = util.Counter()
-
         features["bias"] = 1.0
 
         # compute the location of pacman after he takes the action
@@ -123,29 +120,54 @@ class NewExtractor(FeatureExtractor):
         dx, dy = Actions.directionToVector(action)
         next_x, next_y = int(x + dx), int(y + dy)
 
-        # prioritise capsules over normal food
-        # don't care about scared ghosts, prioritise scared ghosts over normal food
+        hasScaredGhost = False
         scaredGhosts = []
-        normalGhosts = []
-        for g in state.getGhostStates:
-            if g.isScared:
-                scaredGhosts.append(g)
-            else:
-                normalGhosts.append(g)
+        for _, j in enumerate(state.getGhostStates()):
+            if j.scaredTimer > 1:
+                hasScaredGhost = True
+        
+        if hasScaredGhost:
+            hasNoNormalGhostsNearby = True
+            for i, j in enumerate(state.getGhostStates()):
+                if j.scaredTimer > 1:
+                    x, y = j.getPosition()
+                    # consider nearest edible ghost
+                    closestGhost = util.manhattanDistance((next_x, next_y), (x, y))
+                    features["eats-ghosts{}".format(i)] = float(closestGhost) / (walls.width + walls.height)
+                else:
+                    radiusOfOneStep = Actions.getLegalNeighbors(j.getPosition(), walls)
+                    for i in radiusOfOneStep:
+                        if (next_x, next_y) in Actions.getLegalNeighbors(i, walls):
+                            hasNoNormalGhostsNearby = False
 
-        # count the number of normal ghosts 1-step away
-        features["#-of-ghosts-1-step-away"] = sum(
-            (next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in normalGhosts)
+            if hasNoNormalGhostsNearby:
+                features["eats-food"] = 2.0
+        else:
+            numGhostsNearby = 0
+            radiusOfOneStep = []
+            radiusOfTwoSteps = []
+            
+            position = Actions.getLegalNeighbors((next_x, next_y), walls)
 
-        if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
-            features["eats-food"] = 1.0
+            for g in ghosts:
+                radiusOfOneStep += Actions.getLegalNeighbors(g, walls)
+            for step in radiusOfOneStep:
+                if step == (next_x, next_y):
+                    numGhostsNearby += 1
 
-        if not features["#-of-ghosts-1-step-away"] and capsules[next_x][next_y]:
-            features["eats-capsule"] = 3.0
+            for step in radiusOfOneStep:
+                radiusOfTwoSteps += Actions.getLegalNeighbors(step, walls)
 
-        if not features["#-of-ghosts-1-step-away"] and scaredGhosts[next_x][next_y]:
-            features["eats-ghosts"] = 5.0
+            for step in radiusOfTwoSteps:
+                for p in position:
+                    if step == p:
+                        numGhostsNearby += 1
+            features["#-of-ghosts-2-steps-away"] = numGhostsNearby
 
+            if not features["#-of-ghosts-2-steps-away"]:
+                features["eats-food"] = 1.0
+
+        # no change
         dist = closestFood((next_x, next_y), food, walls)
         if dist is not None:
             # make the distance a number less than one otherwise the update
