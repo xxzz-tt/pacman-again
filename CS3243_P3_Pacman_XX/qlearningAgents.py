@@ -145,6 +145,9 @@ class QLearningAgent(ReinforcementAgent):
 
 class PacmanQAgent(QLearningAgent):
     "Exactly the same as QLearningAgent, but with different default parameters"
+    """
+    In particular, you need to implement the update, computeValueFromQValues, getQValue, computeActionFromQValues and getAction methods.
+    """
 
     def __init__(self, epsilon=0.05,gamma=0.8,alpha=0.2, numTraining=0, **args):
         """
@@ -199,11 +202,12 @@ class ApproximateQAgent(PacmanQAgent):
         "*** YOUR CODE HERE ***"
         featureVector = self.featExtractor.getFeatures(state, action)
         dotProduct = 0
-        for f in featureVector:
-            dotProduct += self.weights[f] * featureVector[f]
+
+        for f, fValue in featureVector.items():
+            weight = self.weights[f]
+            dotProduct += weight * fValue
 
         return dotProduct
-        # util.raiseNotDefined()
 
     def update(self, state, action, nextState, reward):
         """
@@ -213,9 +217,9 @@ class ApproximateQAgent(PacmanQAgent):
         # slide 16 is it
         featureVector = self.featExtractor.getFeatures(state, action)
         # need to save as value of next state might change!! bc weights are being updated
-        toAdd = reward + self.discount * self.computeValueFromQValues(nextState) - self.getQValue(state, action)
-        for f in featureVector:
-            self.weights[f] = self.weights[f] + self.alpha * toAdd * featureVector[f]
+        toAdd = reward + self.discount * self.getValue(nextState) - self.getQValue(state, action)
+        for f, fValue in featureVector.items():
+            self.weights[f] += self.alpha * toAdd * fValue
 
         # util.raiseNotDefined()
 
